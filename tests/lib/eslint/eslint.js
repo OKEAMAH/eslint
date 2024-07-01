@@ -26,6 +26,7 @@ const hash = require("../../../lib/cli-engine/hash");
 const { unIndent, createCustomTeardown } = require("../../_utils");
 const { shouldUseFlatConfig } = require("../../../lib/eslint/eslint");
 const coreRules = require("../../../lib/rules");
+const espree = require("espree");
 
 //------------------------------------------------------------------------------
 // Helpers
@@ -67,6 +68,12 @@ describe("ESLint", () => {
         }
     };
     const examplePreprocessorName = "eslint-plugin-processor";
+    const patternProcessor = require("../../fixtures/processors/pattern-processor");
+    const exampleMarkdownPlugin = {
+        processors: {
+            markdown: patternProcessor.defineProcessor(/```(\w+)\n(.+?)\n```(?:\n|$)/gsu)
+        }
+    };
     const originalDir = process.cwd();
     const fixtureDir = path.resolve(fs.realpathSync(os.tmpdir()), "eslint/fixtures");
 
@@ -310,6 +317,29 @@ describe("ESLint", () => {
         });
     });
 
+    describe("hasFlag", () => {
+
+        let eslint;
+
+        it("should return true if the flag is present and active", () => {
+            eslint = new ESLint({ cwd: getFixturePath(), flags: ["test_only"] });
+
+            assert.strictEqual(eslint.hasFlag("test_only"), true);
+        });
+
+        it("should return false if the flag is present and inactive", () => {
+            eslint = new ESLint({ cwd: getFixturePath(), flags: ["test_only_old"] });
+
+            assert.strictEqual(eslint.hasFlag("test_only_old"), false);
+        });
+
+        it("should return false if the flag is not present", () => {
+            eslint = new ESLint({ cwd: getFixturePath() });
+
+            assert.strictEqual(eslint.hasFlag("x_feature"), false);
+        });
+    });
+
     describe("lintText()", () => {
         let eslint;
 
@@ -406,6 +436,52 @@ describe("ESLint", () => {
             assert.strictEqual(results[0].filePath, getFixturePath("passing.js"));
             assert.strictEqual(results[0].messages[0].severity, 1);
             assert.strictEqual(results[0].messages[0].message, "File ignored because of a matching ignore pattern. Use \"--no-ignore\" to disable file ignore settings or use \"--no-warn-ignored\" to suppress this warning.");
+            assert.strictEqual(results[0].messages[0].output, void 0);
+            assert.strictEqual(results[0].errorCount, 0);
+            assert.strictEqual(results[0].warningCount, 1);
+            assert.strictEqual(results[0].fatalErrorCount, 0);
+            assert.strictEqual(results[0].fixableErrorCount, 0);
+            assert.strictEqual(results[0].fixableWarningCount, 0);
+            assert.strictEqual(results[0].usedDeprecatedRules.length, 0);
+            assert.strictEqual(results[0].suppressedMessages.length, 0);
+        });
+
+        it("should return a warning when given a filename without a matching config by --stdin-filename if warnIgnored is true", async () => {
+            eslint = new ESLint({
+                cwd: getFixturePath(".."),
+                overrideConfigFile: true
+            });
+
+            const options = { filePath: "fixtures/file.ts", warnIgnored: true };
+            const results = await eslint.lintText("type foo = { bar: string };", options);
+
+            assert.strictEqual(results.length, 1);
+            assert.strictEqual(results[0].filePath, getFixturePath("file.ts"));
+            assert.strictEqual(results[0].messages[0].severity, 1);
+            assert.strictEqual(results[0].messages[0].message, "File ignored because no matching configuration was supplied.");
+            assert.strictEqual(results[0].messages[0].output, void 0);
+            assert.strictEqual(results[0].errorCount, 0);
+            assert.strictEqual(results[0].warningCount, 1);
+            assert.strictEqual(results[0].fatalErrorCount, 0);
+            assert.strictEqual(results[0].fixableErrorCount, 0);
+            assert.strictEqual(results[0].fixableWarningCount, 0);
+            assert.strictEqual(results[0].usedDeprecatedRules.length, 0);
+            assert.strictEqual(results[0].suppressedMessages.length, 0);
+        });
+
+        it("should return a warning when given a filename outside the base path by --stdin-filename if warnIgnored is true", async () => {
+            eslint = new ESLint({
+                cwd: getFixturePath(),
+                overrideConfigFile: true
+            });
+
+            const options = { filePath: "../file.js", warnIgnored: true };
+            const results = await eslint.lintText("var bar = foo;", options);
+
+            assert.strictEqual(results.length, 1);
+            assert.strictEqual(results[0].filePath, getFixturePath("../file.js"));
+            assert.strictEqual(results[0].messages[0].severity, 1);
+            assert.strictEqual(results[0].messages[0].message, "File ignored because outside of base path.");
             assert.strictEqual(results[0].messages[0].output, void 0);
             assert.strictEqual(results[0].errorCount, 0);
             assert.strictEqual(results[0].warningCount, 1);
@@ -1112,6 +1188,56 @@ describe("ESLint", () => {
             });
         });
 
+        describe("Overlapping searches", () => {
+            it("should not lint the same file multiple times when the file path was passed multiple times", async () => {
+                const cwd = getFixturePath();
+
+                eslint = new ESLint({
+                    cwd,
+                    overrideConfigFile: true
+                });
+
+                const results = await eslint.lintFiles(["files/foo.js", "files/../files/foo.js", "files/foo.js"]);
+
+                assert.strictEqual(results.length, 1);
+                assert.strictEqual(results[0].filePath, path.resolve(cwd, "files/foo.js"));
+                assert.strictEqual(results[0].messages.length, 0);
+                assert.strictEqual(results[0].suppressedMessages.length, 0);
+            });
+
+            it("should not lint the same file multiple times when the file path and a pattern that matches the file were passed", async () => {
+                const cwd = getFixturePath();
+
+                eslint = new ESLint({
+                    cwd,
+                    overrideConfigFile: true
+                });
+
+                const results = await eslint.lintFiles(["files/foo.js", "files/foo*"]);
+
+                assert.strictEqual(results.length, 1);
+                assert.strictEqual(results[0].filePath, path.resolve(cwd, "files/foo.js"));
+                assert.strictEqual(results[0].messages.length, 0);
+                assert.strictEqual(results[0].suppressedMessages.length, 0);
+            });
+
+            it("should not lint the same file multiple times when multiple patterns that match the file were passed", async () => {
+                const cwd = getFixturePath();
+
+                eslint = new ESLint({
+                    cwd,
+                    overrideConfigFile: true
+                });
+
+                const results = await eslint.lintFiles(["files/f*.js", "files/foo*"]);
+
+                assert.strictEqual(results.length, 1);
+                assert.strictEqual(results[0].filePath, path.resolve(cwd, "files/foo.js"));
+                assert.strictEqual(results[0].messages.length, 0);
+                assert.strictEqual(results[0].suppressedMessages.length, 0);
+            });
+        });
+
         describe("Invalid inputs", () => {
 
             [
@@ -1201,6 +1327,22 @@ describe("ESLint", () => {
             assert.strictEqual(results[0].messages.length, 0);
             assert.strictEqual(results[1].messages.length, 0);
             assert.strictEqual(results[0].suppressedMessages.length, 0);
+        });
+
+        // https://github.com/eslint/eslint/issues/18550
+        it("should skip files with non-standard extensions when they're matched only by a '*' files pattern", async () => {
+            eslint = new ESLint({
+                cwd: getFixturePath("files"),
+                overrideConfig: { files: ["*"] },
+                overrideConfigFile: true
+            });
+            const results = await eslint.lintFiles(["."]);
+
+            assert.strictEqual(results.length, 2);
+            assert(
+                results.every(result => /^\.[cm]?js$/u.test(path.extname(result.filePath))),
+                "File with a non-standard extension was linted"
+            );
         });
 
         // https://github.com/eslint/eslint/issues/16413
@@ -1785,6 +1927,46 @@ describe("ESLint", () => {
                 assert.strictEqual(results[0].suppressedMessages.length, 0);
             });
 
+            it("should return a warning when an explicitly given file has no matching config", async () => {
+                eslint = new ESLint({
+                    overrideConfigFile: true,
+                    cwd: getFixturePath()
+                });
+                const filePath = getFixturePath("files", "foo.js2");
+                const results = await eslint.lintFiles([filePath]);
+
+                assert.strictEqual(results.length, 1);
+                assert.strictEqual(results[0].filePath, filePath);
+                assert.strictEqual(results[0].messages[0].severity, 1);
+                assert.strictEqual(results[0].messages[0].message, "File ignored because no matching configuration was supplied.");
+                assert.strictEqual(results[0].errorCount, 0);
+                assert.strictEqual(results[0].warningCount, 1);
+                assert.strictEqual(results[0].fatalErrorCount, 0);
+                assert.strictEqual(results[0].fixableErrorCount, 0);
+                assert.strictEqual(results[0].fixableWarningCount, 0);
+                assert.strictEqual(results[0].suppressedMessages.length, 0);
+            });
+
+            it("should return a warning when an explicitly given file is outside the base path", async () => {
+                eslint = new ESLint({
+                    overrideConfigFile: true,
+                    cwd: getFixturePath("files")
+                });
+                const filePath = getFixturePath("passing.js");
+                const results = await eslint.lintFiles([filePath]);
+
+                assert.strictEqual(results.length, 1);
+                assert.strictEqual(results[0].filePath, filePath);
+                assert.strictEqual(results[0].messages[0].severity, 1);
+                assert.strictEqual(results[0].messages[0].message, "File ignored because outside of base path.");
+                assert.strictEqual(results[0].errorCount, 0);
+                assert.strictEqual(results[0].warningCount, 1);
+                assert.strictEqual(results[0].fatalErrorCount, 0);
+                assert.strictEqual(results[0].fixableErrorCount, 0);
+                assert.strictEqual(results[0].fixableWarningCount, 0);
+                assert.strictEqual(results[0].suppressedMessages.length, 0);
+            });
+
             it("should suppress the warning when an explicitly given file is ignored and warnIgnored is false", async () => {
                 eslint = new ESLint({
                     overrideConfigFile: "eslint.config-with-ignores.js",
@@ -2094,6 +2276,42 @@ describe("ESLint", () => {
                 await assert.rejects(async () => {
                     await eslint.lintFiles(["."]);
                 }, /All files matched by '.' are ignored/u);
+            });
+
+            // https://github.com/eslint/eslint/issues/18597
+            it("should skip files ignored by a pattern with escape character '\\'", async () => {
+                eslint = new ESLint({
+                    cwd: getFixturePath(),
+                    overrideConfigFile: true,
+                    overrideConfig: [
+                        {
+                            ignores: [
+                                "curly-files/\\{a,b}.js" // ignore file named `{a,b}.js`, not files named `a.js` or `b.js`
+                            ]
+                        },
+                        {
+                            rules: {
+                                "no-undef": "warn"
+                            }
+                        }
+                    ]
+                });
+
+                const results = await eslint.lintFiles(["curly-files"]);
+
+                assert.strictEqual(results.length, 2);
+                assert.strictEqual(results[0].filePath, getFixturePath("curly-files", "a.js"));
+                assert.strictEqual(results[0].messages.length, 1);
+                assert.strictEqual(results[0].messages[0].severity, 1);
+                assert.strictEqual(results[0].messages[0].ruleId, "no-undef");
+                assert.strictEqual(results[0].messages[0].messageId, "undef");
+                assert.match(results[0].messages[0].message, /'bar'/u);
+                assert.strictEqual(results[1].filePath, getFixturePath("curly-files", "b.js"));
+                assert.strictEqual(results[1].messages.length, 1);
+                assert.strictEqual(results[1].messages[0].severity, 1);
+                assert.strictEqual(results[1].messages[0].ruleId, "no-undef");
+                assert.strictEqual(results[1].messages[0].messageId, "undef");
+                assert.match(results[1].messages[0].message, /'baz'/u);
             });
 
         });
@@ -3761,6 +3979,178 @@ describe("ESLint", () => {
                     assert(!Object.hasOwn(results[0], "output"));
                 });
             });
+
+            describe("matching and ignoring code blocks", () => {
+                const pluginConfig = {
+                    files: ["**/*.md"],
+                    plugins: {
+                        markdown: exampleMarkdownPlugin
+                    },
+                    processor: "markdown/markdown"
+                };
+                const text = unIndent`
+                    \`\`\`js
+                    foo_js
+                    \`\`\`
+
+                    \`\`\`ts
+                    foo_ts
+                    \`\`\`
+
+                    \`\`\`cjs
+                    foo_cjs
+                    \`\`\`
+
+                    \`\`\`mjs
+                    foo_mjs
+                    \`\`\`
+                `;
+
+                it("should by default lint only .js, .mjs, and .cjs virtual files", async () => {
+                    eslint = new ESLint({
+                        overrideConfigFile: true,
+                        overrideConfig: [
+                            pluginConfig,
+                            {
+                                rules: {
+                                    "no-undef": 2
+                                }
+                            }
+                        ]
+                    });
+                    const [result] = await eslint.lintText(text, { filePath: "foo.md" });
+
+                    assert.strictEqual(result.messages.length, 3);
+                    assert.strictEqual(result.messages[0].ruleId, "no-undef");
+                    assert.match(result.messages[0].message, /foo_js/u);
+                    assert.strictEqual(result.messages[0].line, 2);
+                    assert.strictEqual(result.messages[1].ruleId, "no-undef");
+                    assert.match(result.messages[1].message, /foo_cjs/u);
+                    assert.strictEqual(result.messages[1].line, 10);
+                    assert.strictEqual(result.messages[2].ruleId, "no-undef");
+                    assert.match(result.messages[2].message, /foo_mjs/u);
+                    assert.strictEqual(result.messages[2].line, 14);
+                });
+
+                it("should lint additional virtual files that match non-universal patterns", async () => {
+                    eslint = new ESLint({
+                        overrideConfigFile: true,
+                        overrideConfig: [
+                            pluginConfig,
+                            {
+                                rules: {
+                                    "no-undef": 2
+                                }
+                            },
+                            {
+                                files: ["**/*.ts"]
+                            }
+                        ]
+                    });
+                    const [result] = await eslint.lintText(text, { filePath: "foo.md" });
+
+                    assert.strictEqual(result.messages.length, 4);
+                    assert.strictEqual(result.messages[0].ruleId, "no-undef");
+                    assert.match(result.messages[0].message, /foo_js/u);
+                    assert.strictEqual(result.messages[0].line, 2);
+                    assert.strictEqual(result.messages[1].ruleId, "no-undef");
+                    assert.match(result.messages[1].message, /foo_ts/u);
+                    assert.strictEqual(result.messages[1].line, 6);
+                    assert.strictEqual(result.messages[2].ruleId, "no-undef");
+                    assert.match(result.messages[2].message, /foo_cjs/u);
+                    assert.strictEqual(result.messages[2].line, 10);
+                    assert.strictEqual(result.messages[3].ruleId, "no-undef");
+                    assert.match(result.messages[3].message, /foo_mjs/u);
+                    assert.strictEqual(result.messages[3].line, 14);
+                });
+
+                // https://github.com/eslint/eslint/issues/18493
+                it("should silently skip virtual files that match only universal patterns", async () => {
+                    eslint = new ESLint({
+                        overrideConfigFile: true,
+                        overrideConfig: [
+                            pluginConfig,
+                            {
+                                files: ["**/*"],
+                                rules: {
+                                    "no-undef": 2
+                                }
+                            }
+                        ]
+                    });
+                    const [result] = await eslint.lintText(text, { filePath: "foo.md" });
+
+                    assert.strictEqual(result.messages.length, 3);
+                    assert.strictEqual(result.messages[0].ruleId, "no-undef");
+                    assert.match(result.messages[0].message, /foo_js/u);
+                    assert.strictEqual(result.messages[0].line, 2);
+                    assert.strictEqual(result.messages[1].ruleId, "no-undef");
+                    assert.match(result.messages[1].message, /foo_cjs/u);
+                    assert.strictEqual(result.messages[1].line, 10);
+                    assert.strictEqual(result.messages[2].ruleId, "no-undef");
+                    assert.match(result.messages[2].message, /foo_mjs/u);
+                    assert.strictEqual(result.messages[2].line, 14);
+                });
+
+                it("should silently skip virtual files that are ignored by global ignores", async () => {
+                    eslint = new ESLint({
+                        overrideConfigFile: true,
+                        overrideConfig: [
+                            pluginConfig,
+                            {
+                                rules: {
+                                    "no-undef": 2
+                                }
+                            },
+                            {
+                                ignores: ["**/*.cjs"]
+                            }
+                        ]
+                    });
+                    const [result] = await eslint.lintText(text, { filePath: "foo.md" });
+
+                    assert.strictEqual(result.messages.length, 2);
+                    assert.strictEqual(result.messages[0].ruleId, "no-undef");
+                    assert.match(result.messages[0].message, /foo_js/u);
+                    assert.strictEqual(result.messages[0].line, 2);
+                    assert.strictEqual(result.messages[1].ruleId, "no-undef");
+                    assert.match(result.messages[1].message, /foo_mjs/u);
+                    assert.strictEqual(result.messages[1].line, 14);
+                });
+
+                // https://github.com/eslint/eslint/issues/15949
+                it("should silently skip virtual files that are ignored by global ignores even if they match non-universal patterns", async () => {
+                    eslint = new ESLint({
+                        overrideConfigFile: true,
+                        overrideConfig: [
+                            pluginConfig,
+                            {
+                                rules: {
+                                    "no-undef": 2
+                                }
+                            },
+                            {
+                                files: ["**/*.ts"]
+                            },
+                            {
+                                ignores: ["**/*.md/*.ts"]
+                            }
+                        ]
+                    });
+                    const [result] = await eslint.lintText(text, { filePath: "foo.md" });
+
+                    assert.strictEqual(result.messages.length, 3);
+                    assert.strictEqual(result.messages[0].ruleId, "no-undef");
+                    assert.match(result.messages[0].message, /foo_js/u);
+                    assert.strictEqual(result.messages[0].line, 2);
+                    assert.strictEqual(result.messages[1].ruleId, "no-undef");
+                    assert.match(result.messages[1].message, /foo_cjs/u);
+                    assert.strictEqual(result.messages[1].line, 10);
+                    assert.strictEqual(result.messages[2].ruleId, "no-undef");
+                    assert.match(result.messages[2].message, /foo_mjs/u);
+                    assert.strictEqual(result.messages[2].line, 14);
+                });
+            });
         });
 
         describe("Patterns which match no file should throw errors.", () => {
@@ -4811,6 +5201,16 @@ describe("ESLint", () => {
                 assert(await engine.isPathIgnored("a.js"), "a.js should be ignored");
                 assert(await engine.isPathIgnored("b.js"), "b.js should be ignored");
                 assert(!await engine.isPathIgnored("c.js"), "c.js should not be ignored");
+            });
+
+            it("should interpret ignorePatterns as relative to cwd", async () => {
+                const cwd = getFixturePath("ignored-paths", "subdir");
+                const engine = new ESLint({
+                    ignorePatterns: ["undef.js"],
+                    cwd // using ../../eslint.config.js
+                });
+
+                assert(await engine.isPathIgnored(path.join(cwd, "undef.js")));
             });
 
             it("should return true for files which match an ignorePattern even if they do not exist on the filesystem", async () => {
@@ -6954,6 +7354,7 @@ describe("ESLint", () => {
                         parser: {
                             parse(text, parserOptions) {
                                 resolvedParserOptions = parserOptions;
+                                return espree.parse(text, parserOptions);
                             }
                         },
                         parserOptions: {
