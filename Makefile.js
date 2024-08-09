@@ -73,7 +73,6 @@ const NODE = "node ", // intentional extra space
 
     // Files
     RULE_FILES = glob.sync("lib/rules/*.js").filter(filePath => path.basename(filePath) !== "index.js"),
-    JSON_FILES = find("conf/").filter(fileType("json")),
     MARKDOWNLINT_IGNORE_INSTANCE = ignore().add(fs.readFileSync(path.join(__dirname, ".markdownlintignore"), "utf-8")),
     MARKDOWN_FILES_ARRAY = MARKDOWNLINT_IGNORE_INSTANCE.filter(find("docs/").concat(ls(".")).filter(fileType("md"))),
     TEST_FILES = "\"tests/{bin,conf,lib,tools}/**/*.js\"",
@@ -92,18 +91,6 @@ const NODE = "node ", // intentional extra space
 //------------------------------------------------------------------------------
 // Helpers
 //------------------------------------------------------------------------------
-
-/**
- * Simple JSON file validation that relies on ES JSON parser.
- * @param {string} filePath Path to JSON.
- * @throws Error If file contents is invalid JSON.
- * @returns {undefined}
- */
-function validateJsonFile(filePath) {
-    const contents = fs.readFileSync(filePath, "utf8");
-
-    JSON.parse(contents);
-}
 
 /**
  * Generates a function that matches files with a particular extension.
@@ -572,9 +559,6 @@ target.lint = function([fix = false] = []) {
         errors++;
     }
 
-    echo("Validating JSON Files");
-    JSON_FILES.forEach(validateJsonFile);
-
     echo("Validating Markdown Files");
     lastReturn = lintMarkdown(MARKDOWN_FILES_ARRAY);
     if (lastReturn.code !== 0) {
@@ -651,7 +635,7 @@ target.mocha = () => {
         errors++;
     }
 
-    lastReturn = exec(`${getBinFile("c8")} check-coverage --statement 98 --branch 97 --function 98 --lines 98`);
+    lastReturn = exec(`${getBinFile("c8")} check-coverage --statements 99 --branches 98 --functions 99 --lines 99`);
     if (lastReturn.code !== 0) {
         errors++;
     }
