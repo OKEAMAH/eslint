@@ -45,7 +45,7 @@ npx eslint
 
 If you are not using a flat configuration file, running ESLint without file arguments results in an error.
 
-**Note:** You can also use alternative package managers such as [Yarn](https://yarnpkg.com/) or [pnpm](https://pnpm.io/) to run ESLint. Please refer to your package manager's documentation for the correct syntax.
+**Note:** You can also use alternative package managers such as [Yarn](https://yarnpkg.com/) or [pnpm](https://pnpm.io/) to run ESLint. For pnpm use `pnpm dlx eslint` and for Yarn use `yarn dlx eslint`.
 
 ## Pass Multiple Values to an Option
 
@@ -126,6 +126,7 @@ Miscellaneous:
   -v, --version                   Output the version number
   --print-config path::String     Print the configuration for the given file
   --stats                         Add statistics to the lint report - default: false
+  --flag [String]                 Enable a feature flag
 ```
 
 ### Basic Configuration
@@ -189,7 +190,9 @@ npx eslint --env browser --env node file.js
 
 #### `--ext`
 
-**eslintrc Mode Only.** This option allows you to specify which file extensions ESLint uses when searching for target files in the directories you specify.
+**eslintrc Mode Only.** If you are using flat config (`eslint.config.js`), please see [migration guide](./configure/migration-guide#--ext).
+
+This option allows you to specify which file extensions ESLint uses when searching for target files in the directories you specify.
 
 * **Argument Type**: String. File extension.
 * **Multiple Arguments**: Yes
@@ -403,7 +406,7 @@ npx eslint --fix --fix-type suggestion,layout .
 * **Multiple Arguments**: No
 * **Default Value**:  By default, ESLint looks for `.eslintignore` in the current working directory.
 
-**Note:** `--ignore-path` is only supported when using [deprecated configuration](./configure/configuration-files-deprecated).
+**Note:** `--ignore-path` is only supported when using [deprecated configuration](./configure/configuration-files-deprecated). If you want to include patterns from a `.gitignore` file in your `eslint.config.js` file, please see [including `.gitignore` files](./configure/ignore#including-gitignore-files).
 
 ##### `--ignore-path` example
 
@@ -835,6 +838,19 @@ This option is intended for use with custom formatters that display statistics. 
 
 ```shell
 npx eslint --stats --format json file.js
+```
+
+#### `--flag`
+
+This option enables one or more feature flags for ESLint.
+
+* **Argument Type**: String. A feature identifier.
+* **Multiple Arguments**: Yes
+
+##### `--flag` example
+
+```shell
+npx eslint --flag x_feature file.js
 ```
 
 ## Exit Codes

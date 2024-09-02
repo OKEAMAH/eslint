@@ -22,7 +22,7 @@ You can extend ESLint with plugins in a variety of different ways. Plugins can i
 
 ESLint supports the use of third-party plugins. Plugins are simply objects that conform to a specific interface that ESLint recognizes.
 
-To configure plugins inside of a configuration file, use the `plugins` key, which contains an object with properties representing plugin namespaces and values equal to the plugin object.
+To configure plugins inside of a [configuration file](./configuration-files#configuration-file), use the `plugins` key, which contains an object with properties representing plugin namespaces and values equal to the plugin object.
 
 ```js
 // eslint.config.js
@@ -162,11 +162,11 @@ This configuration object uses `jsd` as the prefix plugin instead of `jsdoc`.
 
 Plugins may provide processors. Processors can extract JavaScript code from other kinds of files, then let ESLint lint the JavaScript code. Alternatively, processors can convert JavaScript code during preprocessing.
 
-To specify processors in a configuration file, use the `processor` key and assign the name of processor in the format `namespace/processor-name`. For example, the following uses the processor from `eslint-plugin-markdown` for `*.md` files.
+To specify processors in a [configuration file](./configuration-files#configuration-file), use the `processor` key and assign the name of processor in the format `namespace/processor-name`. For example, the following uses the processor from `@eslint/markdown` for `*.md` files.
 
 ```js
 // eslint.config.js
-import markdown from "eslint-plugin-markdown";
+import markdown from "@eslint/markdown";
 
 export default [
     {
@@ -183,7 +183,7 @@ Processors may make named code blocks such as `0.js` and `1.js`. ESLint handles 
 
 ```js
 // eslint.config.js
-import markdown from "eslint-plugin-markdown";
+import markdown from "@eslint/markdown";
 
 export default [
 
@@ -213,7 +213,64 @@ export default [
 ];
 ```
 
-ESLint only lints named code blocks when they are JavaScript files or if they match a `files` entry in a config object. Be sure to add a config object with a matching `files` entry if you want to lint non-JavaScript named code blocks.
+ESLint only lints named code blocks when they are JavaScript files or if they match a `files` entry in a config object. Be sure to add a config object with a matching `files` entry if you want to lint non-JavaScript named code blocks. Also note that [global ignores](./ignore) apply to named code blocks as well.
+
+```js
+// eslint.config.js
+import markdown from "@eslint/markdown";
+
+export default [
+
+    // applies to Markdown files
+    {
+        files: ["**/*.md"],
+        plugins: {
+            markdown
+        },
+        processor: "markdown/markdown"
+    },
+
+    // applies to all .jsx files, including jsx blocks inside of Markdown files
+    {
+        files: ["**/*.jsx"],
+        languageOptions: {
+            parserOptions: {
+                ecmaFeatures: {
+                    jsx: true
+                }
+            }
+        }
+    },
+
+    // ignore jsx blocks inside of test.md files
+    {
+        ignores: ["**/test.md/*.jsx"]
+    }
+];
+```
+
+## Specify a Language
+
+Plugins may provide languages. Languages allow ESLint to lint programming languages besides JavaScript. To specify a language in a [configuration file](./configuration-files#configuration-file), use the `language` key and assign the name of language in the format `namespace/language-name`. For example, the following uses the `json/jsonc` language from `@eslint/json` for `*.json` files.
+
+```js
+// eslint.config.js
+import json from "@eslint/json";
+
+export default [
+    {
+        files: ["**/*.json"],
+        plugins: {
+            json
+        },
+        language: "json/jsonc"
+    }
+];
+```
+
+::: tip
+When you specify a `language` in a config object, `languageOptions` becomes specific to that language. Each language defines its own `languageOptions`, so check the documentation of the plugin to determine which options are available.
+:::
 
 ## Common Problems
 

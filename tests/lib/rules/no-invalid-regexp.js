@@ -89,6 +89,9 @@ ruleTester.run("no-invalid-regexp", rule, {
         "new RegExp('[A--B]', flags)", // valid only with `v` flag
         "new RegExp('[[]\\\\u{0}*', flags)", // valid only with `u` flag
 
+        // ES2025
+        "new RegExp('((?<k>a)|(?<k>b))')",
+
         // allowConstructorFlags
         {
             code: "new RegExp('.', 'g')",
@@ -207,6 +210,69 @@ ruleTester.run("no-invalid-regexp", rule, {
             errors: [{
                 messageId: "regexMessage",
                 data: { message: "Invalid flags supplied to RegExp constructor 'a'" },
+                type: "NewExpression"
+            }]
+        },
+        {
+            code: "new RegExp('.', 'aa');",
+            options: [{ allowConstructorFlags: ["a"] }],
+            errors: [{
+                messageId: "regexMessage",
+                data: { message: "Invalid flags supplied to RegExp constructor 'aa'" },
+                type: "NewExpression"
+            }]
+        },
+        {
+            code: "new RegExp('.', 'aa');",
+            options: [{ allowConstructorFlags: ["a", "a"] }],
+            errors: [{
+                messageId: "regexMessage",
+                data: { message: "Invalid flags supplied to RegExp constructor 'aa'" },
+                type: "NewExpression"
+            }]
+        },
+        {
+            code: "new RegExp('.', 'aA');",
+            options: [{ allowConstructorFlags: ["a"] }],
+            errors: [{
+                messageId: "regexMessage",
+                data: { message: "Invalid flags supplied to RegExp constructor 'A'" },
+                type: "NewExpression"
+            }]
+        },
+        {
+            code: "new RegExp('.', 'aaz');",
+            options: [{ allowConstructorFlags: ["a", "z"] }],
+            errors: [{
+                messageId: "regexMessage",
+                data: { message: "Invalid flags supplied to RegExp constructor 'aa'" },
+                type: "NewExpression"
+            }]
+        },
+        {
+            code: "new RegExp('.', 'azz');",
+            options: [{ allowConstructorFlags: ["a", "z"] }],
+            errors: [{
+                messageId: "regexMessage",
+                data: { message: "Invalid flags supplied to RegExp constructor 'zz'" },
+                type: "NewExpression"
+            }]
+        },
+        {
+            code: "new RegExp('.', 'aga');",
+            options: [{ allowConstructorFlags: ["a"] }],
+            errors: [{
+                messageId: "regexMessage",
+                data: { message: "Invalid flags supplied to RegExp constructor 'aa'" },
+                type: "NewExpression"
+            }]
+        },
+        {
+            code: "new RegExp('.', 'uu');",
+            options: [{ allowConstructorFlags: ["u"] }],
+            errors: [{
+                messageId: "regexMessage",
+                data: { message: "Invalid flags supplied to RegExp constructor 'uu'" },
                 type: "NewExpression"
             }]
         },
@@ -354,6 +420,16 @@ ruleTester.run("no-invalid-regexp", rule, {
             errors: [{
                 messageId: "regexMessage",
                 data: { message: "Invalid regular expression: /[[]\\u{0}*/v: Unterminated character class" },
+                type: "NewExpression"
+            }]
+        },
+
+        // ES2025
+        {
+            code: "new RegExp('(?<k>a)(?<k>b)')",
+            errors: [{
+                messageId: "regexMessage",
+                data: { message: "Invalid regular expression: /(?<k>a)(?<k>b)/: Duplicate capture group name" },
                 type: "NewExpression"
             }]
         }

@@ -333,7 +333,7 @@
     "func-style": {
         "type": "suggestion",
         "docs": {
-            "description": "Enforce the consistent use of either `function` declarations or expressions",
+            "description": "Enforce the consistent use of either `function` declarations or expressions assigned to variables",
             "recommended": false,
             "url": "https://eslint.org/docs/latest/rules/func-style"
         }
@@ -2383,7 +2383,8 @@
             "description": "Disallow async functions which have no `await` expression",
             "recommended": false,
             "url": "https://eslint.org/docs/latest/rules/require-await"
-        }
+        },
+        "hasSuggestions": true
     },
     "require-unicode-regexp": {
         "type": "suggestion",

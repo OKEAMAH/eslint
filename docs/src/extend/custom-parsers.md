@@ -14,9 +14,9 @@ ESLint custom parsers let you extend ESLint to support linting new non-standard 
 
 ### Methods in Custom Parsers
 
-A custom parser is a JavaScript object with either a `parse` or `parseForESLint` method. The `parse` method only returns the AST, whereas `parseForESLint` also returns additional values that let the parser customize the behavior of ESLint even more.
+A custom parser is a JavaScript object with either a `parse()` or `parseForESLint()` method. The `parse` method only returns the AST, whereas `parseForESLint()` also returns additional values that let the parser customize the behavior of ESLint even more.
 
-Both methods should take in the source code as the first argument, and an optional configuration object as the second argument, which is provided as [`parserOptions`](../use/configure/language-options#specifying-parser-options) in a configuration file.
+Both methods should be instance (own) properties and take in the source code as the first argument, and an optional configuration object as the second argument, which is provided as [`parserOptions`](../use/configure/language-options#specifying-parser-options) in a configuration file.
 
 ```javascript
 // customParser.js
@@ -45,9 +45,9 @@ The `parseForESLint` method should return an object that contains the required p
 
 * `ast` should contain the [AST](#ast-specification) object.
 * `services` can contain any parser-dependent services (such as type checkers for nodes). The value of the `services` property is available to rules as `context.sourceCode.parserServices`. Default is an empty object.
-* `scopeManager` can be a [ScopeManager](./scope-manager-interface) object. Custom parsers can use customized scope analysis for experimental/enhancement syntaxes. The default is the `ScopeManager` object which is created by [eslint-scope](https://github.com/eslint/eslint-scope).
+* `scopeManager` can be a [ScopeManager](./scope-manager-interface) object. Custom parsers can use customized scope analysis for experimental/enhancement syntaxes. The default is the `ScopeManager` object which is created by [eslint-scope](https://github.com/eslint/js/tree/main/packages/eslint-scope).
     * Support for `scopeManager` was added in ESLint v4.14.0. ESLint versions that support `scopeManager` will provide an `eslintScopeManager: true` property in `parserOptions`, which can be used for feature detection.
-* `visitorKeys` can be an object to customize AST traversal. The keys of the object are the type of AST nodes. Each value is an array of the property names which should be traversed. The default is [KEYS of `eslint-visitor-keys`](https://github.com/eslint/eslint-visitor-keys#evkkeys).
+* `visitorKeys` can be an object to customize AST traversal. The keys of the object are the type of AST nodes. Each value is an array of the property names which should be traversed. The default is [KEYS of `eslint-visitor-keys`](https://github.com/eslint/js/tree/main/packages/eslint-visitor-keys#evkkeys).
     * Support for `visitorKeys` was added in ESLint v4.14.0. ESLint versions that support `visitorKeys` will provide an `eslintVisitorKeys: true` property in `parserOptions`, which can be used for feature detection.
 
 ### Meta Data in Custom Parsers

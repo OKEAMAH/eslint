@@ -5,44 +5,39 @@
 
 "use strict";
 
-/*
- * IMPORTANT!
- *
- * Any changes made to this file must also be made to .eslintrc.js.
- *
- * Internally, ESLint is using the eslint.config.js file to lint itself.
- * The .eslintrc.js file is needed too, because:
- *
- * 1. There are tests that expect .eslintrc.js to be present to actually run.
- * 2. ESLint VS Code extension expects eslintrc config files to be
- *    present to work correctly.
- *
- * Once we no longer need to support both eslintrc and flat config, we will
- * remove .eslintrc.js.
- */
-
 //-----------------------------------------------------------------------------
 // Requirements
 //-----------------------------------------------------------------------------
 
 const path = require("node:path");
-const internalPlugin = require("eslint-plugin-internal-rules");
+const internalPlugin = require("./tools/internal-rules");
 const eslintPluginRulesRecommendedConfig = require("eslint-plugin-eslint-plugin/configs/rules-recommended");
 const eslintPluginTestsRecommendedConfig = require("eslint-plugin-eslint-plugin/configs/tests-recommended");
 const globals = require("globals");
 const eslintConfigESLintCJS = require("eslint-config-eslint/cjs");
+const eslintConfigESLintFormatting = require("eslint-config-eslint/formatting");
+const eslintPluginYml = require("eslint-plugin-yml");
+const json = require("@eslint/json").default;
 
 //-----------------------------------------------------------------------------
 // Helpers
 //-----------------------------------------------------------------------------
 
-const INTERNAL_FILES = {
+const INTERNAL_PATHS = {
     CLI_ENGINE_PATTERN: "lib/cli-engine/**/*",
     LINTER_PATTERN: "lib/linter/**/*",
     RULE_TESTER_PATTERN: "lib/rule-tester/**/*",
     RULES_PATTERN: "lib/rules/**/*",
     SOURCE_CODE_PATTERN: "lib/source-code/**/*"
 };
+
+// same paths but with `.js` at the end
+const INTERNAL_FILES = Object.fromEntries(
+    Object.entries(INTERNAL_PATHS).map(([key, value]) => [key, `${value}.js`])
+);
+
+const ALL_JS_FILES = "**/*.js";
+const ALL_YAML_FILES = "**/*.y?(a)ml";
 
 /**
  * Resolve an absolute path or glob pattern.
@@ -59,7 +54,7 @@ function resolveAbsolutePath(pathOrPattern) {
  * @returns {Object[]} The array of `no-restricted-require` entries.
  */
 function createInternalFilesPatterns(pattern = null) {
-    return Object.values(INTERNAL_FILES)
+    return Object.values(INTERNAL_PATHS)
         .filter(p => p !== pattern)
         .map(p => ({
             name: [
@@ -74,7 +69,16 @@ function createInternalFilesPatterns(pattern = null) {
 }
 
 module.exports = [
-    ...eslintConfigESLintCJS,
+    ...eslintConfigESLintCJS.map(config => ({
+        ...config,
+        name: `eslint/${config.name}`,
+        files: [ALL_JS_FILES]
+    })),
+    {
+        ...eslintConfigESLintFormatting,
+        name: "eslint/formatting",
+        files: [ALL_JS_FILES]
+    },
     {
         name: "eslint/global-ignores",
         ignores: [
@@ -88,12 +92,13 @@ module.exports = [
             "tests/fixtures/**",
             "tests/performance/**",
             "tmp/**",
-            "tools/internal-rules/node_modules/**",
-            "**/test.js"
+            "**/test.js",
+            ".vscode"
         ]
     },
     {
         name: "eslint/internal-rules",
+        files: [ALL_JS_FILES],
         plugins: {
             "internal-rules": internalPlugin
         },
@@ -114,7 +119,7 @@ module.exports = [
     },
     {
         name: "eslint/rules",
-        files: ["lib/rules/*", "tools/internal-rules/*"],
+        files: ["lib/rules/*.js", "tools/internal-rules/*.js"],
         ignores: ["**/index.js"],
         ...eslintPluginRulesRecommendedConfig,
         rules: {
@@ -128,7 +133,7 @@ module.exports = [
     },
     {
         name: "eslint/core-rules",
-        files: ["lib/rules/*"],
+        files: ["lib/rules/*.js"],
         ignores: ["**/index.js"],
         rules: {
             "eslint-plugin/require-meta-docs-url": ["error", { pattern: "https://eslint.org/docs/latest/rules/{{name}}" }]
@@ -136,7 +141,7 @@ module.exports = [
     },
     {
         name: "eslint/rules-tests",
-        files: ["tests/lib/rules/*", "tests/tools/internal-rules/*"],
+        files: ["tests/lib/rules/*.js", "tests/tools/internal-rules/*.js"],
         ...eslintPluginTestsRecommendedConfig,
         rules: {
             ...eslintPluginTestsRecommendedConfig.rules,
@@ -171,10 +176,27 @@ module.exports = [
         }
     },
 
+    // JSON files
+    {
+        name: "eslint/json",
+        files: ["**/*.json", ".c8rc"],
+        ignores: ["**/package-lock.json"],
+        language: "json/json",
+        ...json.configs.recommended
+    },
+
+    // JSONC files
+    {
+        name: "eslint/jsonc",
+        files: ["knip.jsonc"],
+        language: "json/jsonc",
+        ...json.configs.recommended
+    },
+
     // Restrict relative path imports
     {
         name: "eslint/lib",
-        files: ["lib/*"],
+        files: ["lib/*.js"],
         ignores: ["lib/unsupported-api.js"],
         rules: {
             "n/no-restricted-require": ["error", [
@@ -187,7 +209,7 @@ module.exports = [
         files: [INTERNAL_FILES.CLI_ENGINE_PATTERN],
         rules: {
             "n/no-restricted-require": ["error", [
-                ...createInternalFilesPatterns(INTERNAL_FILES.CLI_ENGINE_PATTERN)
+                ...createInternalFilesPatterns(INTERNAL_PATHS.CLI_ENGINE_PATTERN)
             ]]
         }
     },
@@ -196,7 +218,7 @@ module.exports = [
         files: [INTERNAL_FILES.LINTER_PATTERN],
         rules: {
             "n/no-restricted-require": ["error", [
-                ...createInternalFilesPatterns(INTERNAL_FILES.LINTER_PATTERN),
+                ...createInternalFilesPatterns(INTERNAL_PATHS.LINTER_PATTERN),
                 "fs",
                 resolveAbsolutePath("lib/cli-engine/index.js"),
                 resolveAbsolutePath("lib/rule-tester/index.js")
@@ -208,7 +230,7 @@ module.exports = [
         files: [INTERNAL_FILES.RULES_PATTERN],
         rules: {
             "n/no-restricted-require": ["error", [
-                ...createInternalFilesPatterns(INTERNAL_FILES.RULES_PATTERN),
+                ...createInternalFilesPatterns(INTERNAL_PATHS.RULES_PATTERN),
                 "fs",
                 resolveAbsolutePath("lib/cli-engine/index.js"),
                 resolveAbsolutePath("lib/linter/index.js"),
@@ -219,7 +241,7 @@ module.exports = [
     },
     {
         name: "eslint/shared",
-        files: ["lib/shared/**/*"],
+        files: ["lib/shared/**/*.js"],
         rules: {
             "n/no-restricted-require": ["error", [
                 ...createInternalFilesPatterns(),
@@ -235,7 +257,7 @@ module.exports = [
         files: [INTERNAL_FILES.SOURCE_CODE_PATTERN],
         rules: {
             "n/no-restricted-require": ["error", [
-                ...createInternalFilesPatterns(INTERNAL_FILES.SOURCE_CODE_PATTERN),
+                ...createInternalFilesPatterns(INTERNAL_PATHS.SOURCE_CODE_PATTERN),
                 "fs",
                 resolveAbsolutePath("lib/cli-engine/index.js"),
                 resolveAbsolutePath("lib/linter/index.js"),
@@ -252,5 +274,9 @@ module.exports = [
                 resolveAbsolutePath("lib/cli-engine/index.js")
             ]]
         }
-    }
+    },
+    ...eslintPluginYml.configs["flat/recommended"].map(config => ({
+        ...config,
+        files: [ALL_YAML_FILES]
+    }))
 ];

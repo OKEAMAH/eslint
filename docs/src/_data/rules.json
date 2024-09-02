@@ -530,7 +530,7 @@
             },
             {
                 "name": "func-style",
-                "description": "Enforce the consistent use of either `function` declarations or expressions",
+                "description": "Enforce the consistent use of either `function` declarations or expressions assigned to variables",
                 "recommended": false,
                 "fixable": false,
                 "hasSuggestions": false
@@ -1310,7 +1310,7 @@
                 "description": "Disallow async functions which have no `await` expression",
                 "recommended": false,
                 "fixable": false,
-                "hasSuggestions": false
+                "hasSuggestions": true
             },
             {
                 "name": "require-unicode-regexp",
