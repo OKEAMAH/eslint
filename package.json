@@ -88,7 +88,7 @@
     "file-entry-cache": "^8.0.0",
     "find-up": "^7.0.0",
     "glob-parent": "^6.0.2",
-    "ignore": "^5.2.0",
+    "ignore": "^6.0.2",
     "imurmurhash": "^0.1.4",
     "is-glob": "^4.0.0",
     "is-path-inside": "^3.0.3",
