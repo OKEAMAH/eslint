@@ -7,7 +7,7 @@ labels:
 body:
 - type: markdown
   attributes:
-    value: By opening an issue, you agree to abide by the [Open JS Foundation Code of Conduct](https://eslint.org/conduct).
+    value: By opening an issue, you agree to abide by the [OpenJS Foundation Code of Conduct](https://eslint.org/conduct).
 - type: input
   attributes:
     label: Rule details
@@ -47,6 +47,9 @@ body:
     options:
       - label: I am willing to submit a pull request to implement this rule.
         required: false
+- type: markdown
+  attributes:
+    value: Please **do not** open a pull request until this issue has been accepted by the team.
 - type: textarea
   attributes:
     label: Additional comments

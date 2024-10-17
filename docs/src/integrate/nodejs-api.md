@@ -140,9 +140,9 @@ The `ESLint` constructor takes an `options` object. If you omit the `options` ob
 
 * `options.allowInlineConfig` (`boolean`)<br>
   Default is `true`. If `false` is present, ESLint suppresses directive comments in source code. If this option is `false`, it overrides the `noInlineConfig` setting in your configurations.
-* `options.baseConfig` (`ConfigData | null`)<br>
+* `options.baseConfig` (`ConfigData | ConfigData[] | null`)<br>
   Default is `null`. [Configuration object], extended by all configurations used with this instance. You can use this option to define the default settings that will be used if your configuration files don't configure it.
-* `options.overrideConfig` (`ConfigData | null`)<br>
+* `options.overrideConfig` (`ConfigData | ConfigData[] | null`)<br>
   Default is `null`. [Configuration object], overrides all configurations used with this instance. You can use this option to define the settings that will be used even if your configuration files configure it.
 * `options.overrideConfigFile` (`string | boolean`)<br>
   Default is `false`. The path to a configuration file, overrides all configurations used with this instance. The `options.overrideConfig` option is applied after this option is applied.
@@ -168,6 +168,11 @@ The `ESLint` constructor takes an `options` object. If you omit the `options` ob
   Default is `.eslintcache`. The [`eslint.lintFiles()`][eslint-lintfiles] method writes caches into this file.
 * `options.cacheStrategy` (`string`)<br>
   Default is `"metadata"`. Strategy for the cache to use for detecting changed files. Can be either `"metadata"` or `"content"`.
+
+##### Other Options
+
+* `options.flags` (`string[]`)<br>
+  Default is `[]`. The feature flags to enable for this instance.
 
 ### ◆ eslint.lintFiles(patterns)
 
@@ -295,6 +300,26 @@ This method loads a formatter. Formatters convert lint results to a human- or ma
 * (`Promise<LoadedFormatter>`)<br>
   The promise that will be fulfilled with a [LoadedFormatter] object.
 
+### ◆ eslint.hasFlag(flagName)
+
+This method is used to determine if a given feature flag is set, as in this example:
+
+```js
+if (eslint.hasFlag("x_feature")) {
+    // handle flag
+}
+```
+
+#### Parameters
+
+* `flagName` (`string`)<br>
+  The flag to check.
+
+#### Return Value
+
+* (`boolean`)<br>
+  True if the flag is enabled.
+
 ### ◆ ESLint.version
 
 ```js
@@ -302,6 +327,16 @@ const version = ESLint.version;
 ```
 
 The version string of ESLint. E.g. `"7.0.0"`.
+
+This is a static property.
+
+### ◆ ESLint.defaultConfig
+
+```js
+const defaultConfig = ESLint.defaultConfig;
+```
+
+The default configuration that ESLint uses internally. This is provided for tooling that wants to calculate configurations using the same defaults as ESLint. Keep in mind that the default configuration may change from version to version, so you shouldn't rely on any particular keys or values to be present.
 
 This is a static property.
 
@@ -441,8 +476,8 @@ This edit information means replacing the range of the `range` property by the `
 
 The `LoadedFormatter` value is the object to convert the [LintResult] objects to text. The [eslint.loadFormatter()][eslint-loadformatter] method returns it. It has the following method:
 
-* `format` (`(results: LintResult[], resultsMeta: ResultsMeta) => string | Promise<string>`)<br>
-  The method to convert the [LintResult] objects to text. `resultsMeta` is an object that will contain a `maxWarningsExceeded` object if `--max-warnings` was set and the number of warnings exceeded the limit. The `maxWarningsExceeded` object will contain two properties: `maxWarnings`, the value of the `--max-warnings` option, and `foundWarnings`, the number of lint warnings.
+* `format` (`(results: LintResult[], resultsMeta?: ResultsMeta) => string | Promise<string>`)<br>
+  The method to convert the [LintResult] objects to text. `resultsMeta` is an optional parameter that is primarily intended for use by the ESLint CLI and can contain only a `maxWarningsExceeded` property that would be passed through the [`context`](../extend/custom-formatters#the-context-argument) object when this method calls the underlying formatter function. Note that ESLint automatically generates `cwd` and `rulesMeta` properties of the `context` object, so you typically don't need to pass in the second argument when calling this method.
 
 ---
 
@@ -455,9 +490,6 @@ const { loadESLint } = require("eslint");
 
 // loads the default ESLint that the CLI would use based on process.cwd()
 const DefaultESLint = await loadESLint();
-
-// loads the default ESLint that the CLI would use based on the provided cwd
-const CwdDefaultESLint = await loadESLint({ cwd: "/foo/bar" });
 
 // loads the flat config version specifically
 const FlatESLint = await loadESLint({ useFlatConfig: true });
@@ -626,7 +658,7 @@ The information available for each linting message is:
 * `fatal` - usually omitted, but will be set to true if there's a parsing error (not related to a rule).
 * `line` - the line on which the error occurred.
 * `message` - the message that should be output.
-* `nodeType` - the node or token type that was reported with the problem.
+* `nodeType` - (**Deprecated:** This property will be removed in a future version of ESLint.) the node or token type that was reported with the problem.
 * `ruleId` - the ID of the rule that triggered the messages (or null if `fatal` is true).
 * `severity` - either 1 or 2, depending on your configuration.
 * `endColumn` - the end column of the range on which the error occurred (this property is omitted if it's not range).
@@ -727,6 +759,17 @@ This method is used to get the times spent on (parsing, fixing, linting) a file.
 
 This method is used to get the number of autofix passes made. See `fixPasses` property of the [Stats](../extend/stats#-stats-type) object.
 
+### Linter#hasFlag()
+
+This method is used to determine if a given feature flag is set, as in this example:
+
+```js
+const Linter = require("eslint").Linter;
+const linter = new Linter({ flags: ["x_feature"] });
+
+console.log(linter.hasFlag("x_feature")); // true
+```
+
 ---
 
 ## RuleTester
@@ -785,6 +828,8 @@ A test case is an object with the following properties:
 * `name` (string, optional): The name to use for the test case, to make it easier to find
 * `code` (string, required): The source code that the rule should be run on
 * `options` (array, optional): The options passed to the rule. The rule severity should not be included in this list.
+* `before` (function, optional): Function to execute before testing the case.
+* `after` (function, optional): Function to execute after testing the case regardless of its result.
 * `filename` (string, optional): The filename for the given case (useful for rules that make assertions about filenames).
 * `only` (boolean, optional): Run this case exclusively for debugging in supported test frameworks.
 
@@ -794,7 +839,7 @@ In addition to the properties above, invalid test cases can also have the follow
     * `message` (string/regexp): The message for the error. Must provide this or `messageId`
     * `messageId` (string): The Id for the error. Must provide this or `message`. See [testing errors with messageId](#testing-errors-with-messageid) for details
     * `data` (object): Placeholder data which can be used in combination with `messageId`
-    * `type` (string): The type of the reported AST node
+    * `type` (string): (**Deprecated:** This property will be removed in a future version of ESLint.) The type of the reported AST node
     * `line` (number): The 1-based line number of the reported location
     * `column` (number): The 1-based column number of the reported location
     * `endLine` (number): The 1-based line number of the end of the reported location
